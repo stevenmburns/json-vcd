@@ -1,0 +1,13 @@
+*~
+DVEfiles/
+csrc/
+json/
+project/target/
+target/
+test_run_dir/
+ucli.key
+verilog.dump
+foo
+simv
+simv.daidir/
+out.json

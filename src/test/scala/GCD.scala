@@ -44,8 +44,17 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
         val m = mapper.readValue[Seq[Map[String,Any]]](bufferedSource.reader())
         bufferedSource.close
 
-        var reset_state = Option.empty[BigInt]
+/*
+        abstract class PortAction
+        case class InputAction( nm : String, data : Data, value : BigInt)
+        case class OutputAction( nm : String, data : Data, value : BigInt)
 
+        val state_map = scala.collection.mutable.Map.empty[String,BigInt]
+ */
+
+        var reset_state = Option.empty[BigInt]
+        var io_z_state = Option.empty[BigInt]
+        var io_v_state = Option.empty[BigInt]
 
         for { mm <- m} {
           val t = mm("time") match {
@@ -87,9 +96,11 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
                     }
                     if ( variable == "io_z") {
                       io_z = Some(BigInt(value,2))
+                      io_z_state = Some(BigInt(value,2))
                     }
                     if ( variable == "io_v") {
                       io_v = Some(BigInt(value,2))
+                      io_v_state = Some(BigInt(value,2))
                     }
 
                   case _ => throw new Exception()
@@ -106,8 +117,8 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
 
             for { r <- reset_state} {
               if ( r == 0) {
-                for { x <- io_v} { expect( c.io.v, x)}
-                for { x <- io_z} { expect( c.io.z, x)}
+                for { x <- io_v_state} { expect( c.io.v, x)}
+                for { x <- io_z_state} { expect( c.io.z, x)}
               }
             }
 

@@ -1,0 +1,31 @@
+[
+  {
+     "time": 0,
+     "changes": [
+         { "variable": "x",
+           "value": "0x3"
+         },
+         { "variable": "y",
+           "value": "0x7"
+         }
+     ]
+  },
+  {
+     "time": 1,
+     "changes": [
+         { "variable": "x",
+           "value": "0x4"
+         }
+     ]
+  },
+  {
+     "time": 2,
+     "changes": [
+         { "variable": "y",
+           "value": "0x8"
+         }
+     ]
+  }
+]
+     
+     
