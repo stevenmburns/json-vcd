@@ -44,17 +44,17 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
         val m = mapper.readValue[Seq[Map[String,Any]]](bufferedSource.reader())
         bufferedSource.close
 
-/*
-        abstract class PortAction
-        case class InputAction( nm : String, data : Data, value : BigInt)
-        case class OutputAction( nm : String, data : Data, value : BigInt)
-
         val state_map = scala.collection.mutable.Map.empty[String,BigInt]
- */
 
-        var reset_state = Option.empty[BigInt]
-        var io_z_state = Option.empty[BigInt]
-        var io_v_state = Option.empty[BigInt]
+        val input_map = scala.collection.mutable.Map.empty[String,UInt]
+        val output_map = scala.collection.mutable.Map.empty[String,UInt]
+
+
+        input_map("io_a") = c.io.a
+        input_map("io_b") = c.io.b
+        input_map("io_e") = c.io.e
+        output_map("io_z") = c.io.z
+        output_map("io_v") = c.io.v
 
         for { mm <- m} {
           val t = mm("time") match {
@@ -64,11 +64,11 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
 
           var reset_ = Option.empty[BigInt]
           var clock = Option.empty[BigInt]
-          var io_a = Option.empty[BigInt]
-          var io_b = Option.empty[BigInt]
-          var io_e = Option.empty[BigInt]
-          var io_z = Option.empty[BigInt]
-          var io_v = Option.empty[BigInt]
+
+          val inputs = scala.collection.mutable.ArrayBuffer.empty[(String,UInt,BigInt)]
+
+          val outputs = scala.collection.mutable.ArrayBuffer.empty[(String,UInt,BigInt)]
+
 
           mm("changes") match {
             case c : Seq[Map[String,String]] =>
@@ -77,32 +77,21 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
                   case q : Map[String,String] =>
                     val variable : String = q("variable")
                     val value : String = q("value")
-
                     if ( variable == "reset") {
                       reset_ = Some(BigInt(value,2))
-                      reset_state = Some(BigInt(value,2))
-                    }
-                    if ( variable == "clock") {
+                      state_map("reset") = BigInt(value,2)
+                    } else if ( variable == "clock") {
                       clock = Some(BigInt(value,2))
+                    } else if ( input_map.contains(variable)) {
+                      val t = (variable,input_map(variable),BigInt(value,2))
+                      inputs += t
+                    } else if ( output_map.contains(variable)) {
+                      val t = (variable,output_map(variable),BigInt(value,2))
+                      outputs += t
+                      state_map(variable) = BigInt(value,2)
+                    } else {
+                      throw new Exception
                     }
-                    if ( variable == "io_a") {
-                      io_a = Some(BigInt(value,2))
-                    }
-                    if ( variable == "io_b") {
-                      io_b = Some(BigInt(value,2))
-                    }
-                    if ( variable == "io_e") {
-                      io_e = Some(BigInt(value,2))
-                    }
-                    if ( variable == "io_z") {
-                      io_z = Some(BigInt(value,2))
-                      io_z_state = Some(BigInt(value,2))
-                    }
-                    if ( variable == "io_v") {
-                      io_v = Some(BigInt(value,2))
-                      io_v_state = Some(BigInt(value,2))
-                    }
-
                   case _ => throw new Exception()
                 }
               }
@@ -111,26 +100,35 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
 
           assert(t % 1000 == 0)
 
+          assert( clock.isDefined)
+
           if ( clock.get == 1) {
+            // At time zero inputs can be set (maybe we need to remember these)
+            assert( t == 0 || inputs.size == 0)
+
             assert( t % 2000 == 0) 
             step(1)
 
-            for { r <- reset_state} {
-              if ( r == 0) {
-                for { x <- io_v_state} { expect( c.io.v, x)}
-                for { x <- io_z_state} { expect( c.io.z, x)}
-              }
+            val BigZero = BigInt(0)
+
+            state_map.get("reset") match {
+              case Some(BigZero) => 
+                for { (k,v) <- state_map } {
+                  if ( k != "reset") {
+                    expect( output_map(k), v)
+                  }
+                }
+              case _ =>
+
             }
-
           } else {
-
             assert( t % 2000 == 1000) 
 
-            for { x <- reset_} { if ( x == 1) reset() }
-            for { x <- io_a} { poke( c.io.a, x) }
-            for { x <- io_b} { poke( c.io.b, x) }
-            for { x <- io_e} { poke( c.io.e, x) }
+            for { (k,d,v) <- inputs} {
+              poke( d, v)
+            }
 
+            for { x <- reset_} { if ( x == 1) reset() }
           }
         }
       }
