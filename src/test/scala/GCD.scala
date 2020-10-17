@@ -38,6 +38,8 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
     chisel3.iotesters.Driver.execute( factory, optionsManager) { c =>
       new PeekPokeTester(c) {
 
+        val BigZero = BigInt(0)
+
         val bufferedSource = Source.fromFile(fn)
         val mapper = new ObjectMapper() with ScalaObjectMapper
         mapper.registerModule(DefaultScalaModule)
@@ -67,9 +69,6 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
 
           val inputs = scala.collection.mutable.ArrayBuffer.empty[(String,UInt,BigInt)]
 
-          val outputs = scala.collection.mutable.ArrayBuffer.empty[(String,UInt,BigInt)]
-
-
           mm("changes") match {
             case c : Seq[Map[String,String]] =>
               for { mmm <- c} {
@@ -80,14 +79,13 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
                     if ( variable == "reset") {
                       reset_ = Some(BigInt(value,2))
                       state_map("reset") = BigInt(value,2)
+                      println(s"reset changed to $value")
                     } else if ( variable == "clock") {
                       clock = Some(BigInt(value,2))
                     } else if ( input_map.contains(variable)) {
                       val t = (variable,input_map(variable),BigInt(value,2))
                       inputs += t
                     } else if ( output_map.contains(variable)) {
-                      val t = (variable,output_map(variable),BigInt(value,2))
-                      outputs += t
                       state_map(variable) = BigInt(value,2)
                     } else {
                       throw new Exception
@@ -102,34 +100,36 @@ class JsonTester( factory: () => GCDInner, fn : String) extends GenericTest {
 
           assert( clock.isDefined)
 
+          def value_is_zero( x : Option[BigInt]) =
+            x match {
+              case Some(BigZero) => true
+              case _ => false
+            }
+
           if ( clock.get == 1) {
-            // At time zero inputs can be set (maybe we need to remember these)
-            assert( t == 0 || inputs.size == 0)
-
             assert( t % 2000 == 0) 
-            step(1)
-
-            val BigZero = BigInt(0)
-
-            state_map.get("reset") match {
-              case Some(BigZero) => 
-                for { (k,v) <- state_map } {
-                  if ( k != "reset") {
-                    expect( output_map(k), v)
-                  }
-                }
-              case _ =>
-
+            if (value_is_zero( state_map.get("reset"))) {
+              step(1)
+            } else {
+              reset()
             }
           } else {
             assert( t % 2000 == 1000) 
-
-            for { (k,d,v) <- inputs} {
-              poke( d, v)
-            }
-
-            for { x <- reset_} { if ( x == 1) reset() }
           }
+
+          if ( value_is_zero( state_map.get("reset")) &&
+               !value_is_zero( reset_)) {
+              for { (k,v) <- state_map } {
+                if ( k != "reset") {
+                  expect( output_map(k), v)
+                }
+              }
+          }
+
+          for { (k,d,v) <- inputs} {
+            poke( d, v)
+          }
+
         }
       }
     } should be (true)

@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <typeinfo>
 
 using namespace nlohmann;
 
@@ -16,6 +17,10 @@ int main()
     return 1;
   }
   auto j = json::parse(ifs);
+
+  std::cout << "Type of j: " << typeid(j).name() << std::endl;
+
+  ifs.close();
 
   for (json::iterator it = j.begin(); it != j.end(); ++it) {
     std::cout << "Time: " << it->at("time") << std::endl;
