@@ -9,7 +9,6 @@ reg [15:0] io_a ;
 reg reset ;
 reg clock ;
 
-initial #45002 $finish;
 initial $dumpvars;
 
 initial begin
@@ -39,6 +38,10 @@ int                                          _io_v;
    assign _io_v = io_v;   
 
 always_ff @(clock) begin
+   if ( bench_done()) begin
+      $finish;
+   end;
+
    bench( _reset, _io_a, _io_b, _io_e, _clock, _io_z, _io_v);
    reset <= _reset;
    io_a <= _io_a;

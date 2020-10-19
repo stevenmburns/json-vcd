@@ -4,6 +4,10 @@
 #include <string>
 #include <cassert>
 
+#include <set>
+#include <map>
+#include <optional>
+
 //#include "svdpi.h"
 
 using namespace nlohmann;
@@ -16,8 +20,9 @@ public:
   json::iterator it;
 
   int state_reset;
-  int state_io_v;
-  int state_io_z;
+  std::map<std::string,std::optional<unsigned int> > state_values;
+
+
 
   Bench() {
     _bad = 0;
@@ -31,10 +36,14 @@ public:
       ifs.close();
       it = j.begin();
     }
+
+    state_values.insert( std::make_pair("io_z", std::optional<unsigned int>()));
+    state_values.insert( std::make_pair("io_v", std::optional<unsigned int>()));
+
   }
 
   bool done() {
-    return it == j.end();
+    return _bad || it == j.end();
   }
 
   void process_time( int& reset, int& io_a, int& io_b, int& io_e, int clock, int io_z, int io_v) {
@@ -51,9 +60,18 @@ public:
 
     bool reset_change = false;
 
+    std::map<std::string,int*> input_values;
+    input_values.insert(std::make_pair( "io_a", &io_a));
+    input_values.insert(std::make_pair( "io_b", &io_b));
+    input_values.insert(std::make_pair( "io_e", &io_e));
 
-    auto &j2 = it->at("changes");
-    for (json::iterator it2 = j2.begin(); it2 != j2.end(); ++it2) {
+    std::map<std::string,int> output_values;
+    output_values.insert(std::make_pair( "io_v", io_v));
+    output_values.insert(std::make_pair( "io_z", io_z));
+
+
+    const auto & j2 = it->at("changes");
+    for (json::const_iterator it2 = j2.begin(); it2 != j2.end(); ++it2) {
       std::cout << "\t" << it2->at("variable") << " " << it2->at("value") << std::endl;
       std::string val(it2->at("value"));
       if ( it2->at("variable") == "reset") {
@@ -61,28 +79,25 @@ public:
         state_reset = reset;
         reset_change = true;
       }
-      if ( it2->at("variable") == "io_a") {
-        io_a = std::stoi(val,0,2);
+      {
+        auto it3 = input_values.find(it2->at("variable"));
+        if ( it3 != input_values.end()) {
+          *(it3->second) = std::stoi(val,0,2);
+        }
       }
-      if ( it2->at("variable") == "io_b") {
-        io_b = std::stoi(val,0,2);
+      {
+        auto it3 = state_values.find(it2->at("variable"));
+        if ( it3 != state_values.end()) {
+          *(it3->second) = std::stoi(val,0,2);
+        }
       }
-      if ( it2->at("variable") == "io_e") {
-        io_e = std::stoi(val,0,2);
-      }
-      if ( it2->at("variable") == "io_v") {
-        state_io_v = std::stoi(val,0,2);
-      }
-      if ( it2->at("variable") == "io_z") {
-        state_io_z = std::stoi(val,0,2);
-      }
+
     }
 
     if ( clock == 0 && state_reset == 0 && !reset_change) {
-      std::cout << "io_v: " << state_io_v << " " << io_v << std::endl;
-      std::cout << "io_z: " << state_io_z << " " << io_z << std::endl;
-      assert( state_io_v == io_v);
-      assert( state_io_z == io_z);
+      for (auto it3 = output_values.begin(); it3 != output_values.end(); ++it3) {
+        assert( it3->second == *state_values[it3->first]);
+      }
     }
 
     ++it;
@@ -94,34 +109,23 @@ public:
 static Bench bench_object;
 
 extern "C" {
-void bench( int *reset,
-            int *io_a,
-            int *io_b,
-            int *io_e,
-            int clock,
-            int io_z,
-            int io_v) {
-  std::cout << "Clock: " << clock << std::endl;
-  if ( !bench_object.done()) {
-    bench_object.process_time(*reset,*io_a,*io_b,*io_e,clock,io_z,io_v);
-  }
-}
-}
-               
-#if 0
-{
-  
-
-  for (json::iterator it = j.begin(); it != j.end(); ++it) {
-    std::cout << "Time: " << it->at("time") << std::endl;
-
-    auto &j2 = it->at("changes");
-    for (json::iterator it2 = j2.begin(); it2 != j2.end(); ++it2) {
-      std::cout << "\t" << it2->at("variable") << " " << it2->at("value") << std::endl;
+  void bench( int *reset,
+              int *io_a,
+              int *io_b,
+              int *io_e,
+              int clock,
+              int io_z,
+              int io_v) {
+    std::cout << "Clock: " << clock << std::endl;
+    if ( !bench_object.done()) {
+      bench_object.process_time(*reset,*io_a,*io_b,*io_e,clock,io_z,io_v);
     }
   }
-
-
-  return 0;
 }
-#endif  
+
+extern "C" {
+  int bench_done( int *reset) {
+    return bench_object.done();
+  }
+}
+               
