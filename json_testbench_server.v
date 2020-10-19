@@ -1,20 +1,17 @@
 `timescale 1ps / 1ps
 
-module json_testbench();
-wire io_v ;
-wire [15:0] io_z ;
-reg io_e ;
-reg [15:0] io_b ;
-reg [15:0] io_a ;
-reg reset ;
-reg clock ;
+module json_testbench_server( clock, reset, io_a, io_b, io_e, io_v, io_z, done);
 
-initial $dumpvars;
-
-initial begin
-     clock = 1'b1;
-    forever #1000  clock = ~ clock ;
-end
+input wire clock;
+   
+input wire io_v ;
+input wire [15:0] io_z ;
+output reg io_e ;
+output reg [15:0] io_b ;
+output reg [15:0] io_a ;
+output reg reset ;
+output reg done ;
+   
 
 import "DPI-C" function void bench(output int reset,
                                    output int io_a,
@@ -40,9 +37,14 @@ int                                          _io_v;
    assign _io_v = io_v;   
 
 always_ff @(clock) begin
-   if ( bench_done()) begin
-      $finish;
-   end;
+   if ( reset) begin
+      done <= 1'b0;
+   end
+   else begin
+      if ( bench_done()) begin
+         done <= 1'b1;
+      end
+   end
 
    bench( _reset, _io_a, _io_b, _io_e, _clock, _io_z, _io_v);
    reset <= _reset;
@@ -51,5 +53,4 @@ always_ff @(clock) begin
    io_e <= _io_e;
 end
 
-GCDInner GCDInner (clock,reset,io_a,io_b,io_e,io_z,io_v);
 endmodule

@@ -11,3 +11,5 @@ foo
 simv
 simv.daidir/
 out.json
+*.o
+vc_hdrs.h
